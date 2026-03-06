@@ -1,4 +1,6 @@
 import type { Hooks, Plugin } from "@opencode-ai/plugin"
+import { fetchModels } from "./fetch.js"
+import { buildModels, type RequestyProvider } from "./model.js"
 
 export type Log = (level: "debug" | "info" | "warn" | "error", message: string, extra?: Record<string, unknown>) => Promise<void>
 
@@ -7,6 +9,8 @@ export function requesty(_: {
   fetch?: typeof fetch
   timeout?: number
 } = {}): NonNullable<Hooks["auth"]> {
+  const opts = _
+
   return {
     provider: "requesty",
     methods: [
@@ -29,7 +33,26 @@ export function requesty(_: {
         },
       },
     ],
-    async loader() {
+    async loader(auth, provider) {
+      const info = await auth()
+      if (!provider?.models || info.type !== "api" || !info.key) return {}
+
+      const count = Object.keys(provider.models).length
+      const live = await fetchModels(info.key, opts).catch(async (err) => {
+        await opts.log?.("warn", "failed to refresh Requesty model catalog", {
+          error: err instanceof Error ? err.message : String(err),
+        })
+        return undefined
+      })
+
+      if (!live) return {}
+
+      const next = buildModels(provider as RequestyProvider, live)
+      await opts.log?.("debug", "refreshed Requesty model catalog", {
+        before: count,
+        after: Object.keys(next).length,
+      })
+
       return {}
     },
   }
