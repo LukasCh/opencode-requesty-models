@@ -3,12 +3,26 @@
   "name": "opencode-requesty-models",
   "version": "0.1.0",
   "description": "OpenCode plugin that replaces Requesty seeded models with the live key-scoped catalog",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LukasCh/opencode-requesty-models.git"
+  },
+  "homepage": "https://github.com/LukasCh/opencode-requesty-models#readme",
+  "bugs": {
+    "url": "https://github.com/LukasCh/opencode-requesty-models/issues"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "requesty"
+  ],
   "files": [
     "dist",
     "README.md"

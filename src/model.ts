@@ -126,8 +126,8 @@ function seed(provider: RequestyProvider) {
   return Object.values(provider.models)[0] ?? blank(provider.id)
 }
 
-function base(provider: RequestyProvider) {
-  const model = seed(provider)
+function base(provider: RequestyProvider, source: Record<string, RequestyRuntimeModel>) {
+  const model = Object.values(source)[0] ?? seed(provider)
   return {
     ...blank(provider.id),
     api: {
@@ -212,9 +212,9 @@ function capabilities(seed: RequestyRuntimeModel, item: RequestyModel) {
   }
 }
 
-function build(provider: RequestyProvider, item: RequestyModel) {
-  const hit = provider.models[item.id]
-  const match = hit ?? base(provider)
+function build(provider: RequestyProvider, source: Record<string, RequestyRuntimeModel>, item: RequestyModel) {
+  const hit = source[item.id]
+  const match = hit ?? base(provider, source)
 
   return {
     ...match,
@@ -239,7 +239,19 @@ function build(provider: RequestyProvider, item: RequestyModel) {
 }
 
 export function buildModels(provider: RequestyProvider, models: RequestyModel[]) {
-  const next = Object.fromEntries(models.map((item) => [item.id, build(provider, item)]))
-  provider.models = next
-  return next
+  const curr = provider.models
+  const source = { ...curr }
+  const keep = new Set(models.map((item) => item.id))
+
+  for (const id of Object.keys(curr)) {
+    if (!keep.has(id)) delete curr[id]
+  }
+
+  for (const item of models) {
+    const next = build(provider, source, item)
+    const hit = curr[item.id]
+    curr[item.id] = hit ? Object.assign(hit, next) : next
+  }
+
+  return curr
 }

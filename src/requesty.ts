@@ -33,7 +33,8 @@ export function requesty(opts: {
     ],
     async loader(auth, provider) {
       const info = await auth()
-      if (!provider?.models || info.type !== "api" || !info.key) return {}
+      if (!provider?.models) return {}
+      if (info.type !== "api" || !info.key) return {}
 
       const count = Object.keys(provider.models).length
       const live = await fetchModels(info.key, opts).catch(async (err) => {

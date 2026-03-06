@@ -6,8 +6,12 @@ import { payload, provider } from "./fixture.ts"
 describe("buildModels", () => {
   test("overrides seeded fields and removes stale models", () => {
     const state = provider()
+    const map = state.models
+    const model = state.models["deepseek/deepseek-chat"]
     const next = buildModels(state, parseModels(payload))
 
+    expect(next).toBe(map)
+    expect(next["deepseek/deepseek-chat"]).toBe(model)
     expect(Object.keys(next)).toEqual(["deepseek/deepseek-chat", "zai/GLM-4.5"])
     expect(next["deepseek/deepseek-chat"]).toMatchObject({
       id: "deepseek/deepseek-chat",

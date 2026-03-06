@@ -11,7 +11,14 @@ export async function fetchModels(key: string, opts: { fetch?: typeof fetch; tim
     signal: AbortSignal.timeout(opts.timeout ?? 5000),
   })
 
-  if (!res.ok) throw new Error(`Requesty models request failed with ${res.status}`)
+  if (!res.ok) {
+    const body = (await res.text()).trim().slice(0, 300)
+    throw new Error(
+      body
+        ? `Requesty models request failed with ${res.status}: ${body}`
+        : `Requesty models request failed with ${res.status}`,
+    )
+  }
 
   return parseModels(await res.json())
 }
