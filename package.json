@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "opencode-requesty-models",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "OpenCode plugin that replaces Requesty seeded models with the live key-scoped catalog",
   "license": "MIT",
   "type": "module",
