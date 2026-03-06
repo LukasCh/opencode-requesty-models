@@ -3,12 +3,14 @@ import { buildModels } from "../src/model.ts"
 import { parseModels } from "../src/parse.ts"
 import { payload, provider } from "./fixture.ts"
 
+const pkg = "@ai-sdk/openai-compatible"
+
 describe("buildModels", () => {
   test("overrides seeded fields and removes stale models", () => {
     const state = provider()
     const map = state.models
     const model = state.models["deepseek/deepseek-chat"]
-    const next = buildModels(state, parseModels(payload))
+    const next = buildModels(state, parseModels(payload), pkg)
 
     expect(next).toBe(map)
     expect(next["deepseek/deepseek-chat"]).toBe(model)
@@ -56,7 +58,7 @@ describe("buildModels", () => {
 
   test("creates conservative synthetic models for live-only ids", () => {
     const state = provider()
-    const next = buildModels(state, parseModels(payload))
+    const next = buildModels(state, parseModels(payload), pkg)
 
     expect(next["zai/GLM-4.5"]).toEqual({
       id: "zai/GLM-4.5",
@@ -64,7 +66,7 @@ describe("buildModels", () => {
       api: {
         id: "zai/GLM-4.5",
         url: "https://router.requesty.ai/v1",
-        npm: "@ai-sdk/openai-compatible",
+        npm: pkg,
       },
       name: "zai/GLM-4.5",
       family: undefined,
@@ -109,5 +111,32 @@ describe("buildModels", () => {
       release_date: "2025-10-16",
       variants: {},
     })
+  })
+
+  test("uses the OpenAI-compatible SDK for responses models", () => {
+    const state = provider()
+    const next = buildModels(state, [
+      {
+        id: "openai/gpt-5.4",
+        api: "responses",
+        supports_reasoning: true,
+        supports_tool_calling: true,
+      },
+    ], pkg)
+
+    expect(next["openai/gpt-5.4"]?.api.npm).toBe(pkg)
+  })
+
+  test("uses the OpenAI-compatible SDK for reasoning OpenAI models", () => {
+    const state = provider()
+    const next = buildModels(state, [
+      {
+        id: "openai/gpt-5.4",
+        api: "chat",
+        supports_reasoning: true,
+      },
+    ], pkg)
+
+    expect(next["openai/gpt-5.4"]?.api.npm).toBe(pkg)
   })
 })

@@ -138,6 +138,11 @@ function base(provider: RequestyProvider, source: Record<string, RequestyRuntime
   }
 }
 
+function npm(seed: RequestyRuntimeModel, pkg: string) {
+  if (seed.api.npm === pkg) return seed.api.npm
+  return pkg
+}
+
 function price(value: number | undefined) {
   if (value === undefined) return undefined
   return value * 1_000_000
@@ -212,7 +217,7 @@ function capabilities(seed: RequestyRuntimeModel, item: RequestyModel) {
   }
 }
 
-function build(provider: RequestyProvider, source: Record<string, RequestyRuntimeModel>, item: RequestyModel) {
+function build(provider: RequestyProvider, source: Record<string, RequestyRuntimeModel>, item: RequestyModel, pkg: string) {
   const hit = source[item.id]
   const match = hit ?? base(provider, source)
 
@@ -223,7 +228,7 @@ function build(provider: RequestyProvider, source: Record<string, RequestyRuntim
     api: {
       id: item.id,
       url: match.api.url,
-      npm: match.api.npm,
+      npm: npm(match, pkg),
     },
     name: item.name ?? hit?.name ?? item.id,
     family: item.family ?? hit?.family,
@@ -238,7 +243,7 @@ function build(provider: RequestyProvider, source: Record<string, RequestyRuntim
   } satisfies RequestyRuntimeModel
 }
 
-export function buildModels(provider: RequestyProvider, models: RequestyModel[]) {
+export function buildModels(provider: RequestyProvider, models: RequestyModel[], pkg: string) {
   const curr = provider.models
   const source = { ...curr }
   const keep = new Set(models.map((item) => item.id))
@@ -248,7 +253,7 @@ export function buildModels(provider: RequestyProvider, models: RequestyModel[])
   }
 
   for (const item of models) {
-    const next = build(provider, source, item)
+    const next = build(provider, source, item, pkg)
     const hit = curr[item.id]
     curr[item.id] = hit ? Object.assign(hit, next) : next
   }
