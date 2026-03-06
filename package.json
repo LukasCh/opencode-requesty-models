@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "opencode-requesty-models",
+  "version": "0.1.0",
+  "description": "OpenCode plugin that replaces Requesty seeded models with the live key-scoped catalog",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "bun test",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "^1.2.20",
+    "@types/bun": "^1.3.9",
+    "typescript": "^5.8.2"
+  }
+}
