@@ -126,6 +126,18 @@ function seed(provider: RequestyProvider) {
   return Object.values(provider.models)[0] ?? blank(provider.id)
 }
 
+function base(provider: RequestyProvider) {
+  const model = seed(provider)
+  return {
+    ...blank(provider.id),
+    api: {
+      id: "",
+      url: model.api.url,
+      npm: model.api.npm,
+    },
+  }
+}
+
 function price(value: number | undefined) {
   if (value === undefined) return undefined
   return value * 1_000_000
@@ -201,7 +213,8 @@ function capabilities(seed: RequestyRuntimeModel, item: RequestyModel) {
 }
 
 function build(provider: RequestyProvider, item: RequestyModel) {
-  const match = provider.models[item.id] ?? seed(provider)
+  const hit = provider.models[item.id]
+  const match = hit ?? base(provider)
 
   return {
     ...match,
@@ -212,16 +225,16 @@ function build(provider: RequestyProvider, item: RequestyModel) {
       url: match.api.url,
       npm: match.api.npm,
     },
-    name: item.name ?? match.name ?? item.id,
-    family: item.family ?? match.family,
+    name: item.name ?? hit?.name ?? item.id,
+    family: item.family ?? hit?.family,
     capabilities: capabilities(match, item),
     cost: cost(match, item),
     limit: limit(match, item),
     status: "active",
-    options: provider.models[item.id] ? match.options : {},
-    headers: provider.models[item.id] ? match.headers : {},
-    release_date: match.release_date || date(item.created) || "",
-    variants: provider.models[item.id] ? match.variants ?? {} : {},
+    options: hit ? match.options : {},
+    headers: hit ? match.headers : {},
+    release_date: hit?.release_date || date(item.created) || "",
+    variants: hit ? match.variants ?? {} : {},
   } satisfies RequestyRuntimeModel
 }
 

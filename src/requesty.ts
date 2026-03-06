@@ -4,13 +4,11 @@ import { buildModels, type RequestyProvider } from "./model.js"
 
 export type Log = (level: "debug" | "info" | "warn" | "error", message: string, extra?: Record<string, unknown>) => Promise<void>
 
-export function requesty(_: {
+export function requesty(opts: {
   log?: Log
   fetch?: typeof fetch
   timeout?: number
 } = {}): NonNullable<Hooks["auth"]> {
-  const opts = _
-
   return {
     provider: "requesty",
     methods: [
