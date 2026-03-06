@@ -62,7 +62,7 @@ export type RequestyRuntimeModel = {
 export type RequestyProvider = {
   id: string
   name: string
-  source: string
+  source: "env" | "config" | "custom" | "api"
   env: string[]
   key?: string
   options: Record<string, unknown>

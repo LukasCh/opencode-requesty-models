@@ -1,8 +1,9 @@
 import { parseModels } from "./parse.js"
 
 export const requestyModelsUrl = "https://router.requesty.ai/v1/models"
+export type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 
-export async function fetchModels(key: string, opts: { fetch?: typeof fetch; timeout?: number } = {}) {
+export async function fetchModels(key: string, opts: { fetch?: Fetcher; timeout?: number } = {}) {
   const res = await (opts.fetch ?? fetch)(requestyModelsUrl, {
     headers: {
       Authorization: `Bearer ${key}`,

@@ -1,12 +1,12 @@
 import type { Hooks, Plugin } from "@opencode-ai/plugin"
-import { fetchModels } from "./fetch.js"
+import { fetchModels, type Fetcher } from "./fetch.js"
 import { buildModels, type RequestyProvider } from "./model.js"
 
 export type Log = (level: "debug" | "info" | "warn" | "error", message: string, extra?: Record<string, unknown>) => Promise<void>
 
 export function requesty(opts: {
   log?: Log
-  fetch?: typeof fetch
+  fetch?: Fetcher
   timeout?: number
 } = {}): NonNullable<Hooks["auth"]> {
   return {
@@ -14,21 +14,7 @@ export function requesty(opts: {
     methods: [
       {
         type: "api",
-        label: "Requesty API key",
-        prompts: [
-          {
-            type: "text",
-            key: "key",
-            message: "Enter your Requesty API key",
-            placeholder: "rq_...",
-            validate: (value) => (value.trim() ? undefined : "Required"),
-          },
-        ],
-        async authorize(input = {}) {
-          const key = input.key?.trim()
-          if (!key) return { type: "failed" as const }
-          return { type: "success" as const, key }
-        },
+        label: "API key",
       },
     ],
     async loader(auth, provider) {

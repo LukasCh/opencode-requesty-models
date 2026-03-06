@@ -14,6 +14,7 @@ OpenCode plugin that replaces Requesty's seeded `models.dev` catalog with the li
 
 - Requesty must already exist as a seeded provider in OpenCode
 - credentials must be saved with `opencode auth requesty`
+- the plugin reuses OpenCode's built-in API-key prompt for Requesty auth
 - env-only `REQUESTY_API_KEY` is not supported in v1 because OpenCode only runs plugin auth loaders for saved auth
 
 ## Install From npm

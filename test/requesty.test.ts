@@ -3,15 +3,13 @@ import { requesty } from "../src/requesty.ts"
 import { payload, provider } from "./fixture.ts"
 
 describe("requesty auth hook", () => {
-  test("stores api keys through the plugin auth method", async () => {
+  test("keeps auth on the default api-key flow", async () => {
     const hook = requesty()
     const method = hook.methods[0]
 
-    if (method.type !== "api" || !method.authorize) throw new Error("missing api authorize")
-
-    await expect(method.authorize({ key: "rq_test" })).resolves.toEqual({
-      type: "success",
-      key: "rq_test",
+    expect(method).toEqual({
+      type: "api",
+      label: "API key",
     })
   })
 
