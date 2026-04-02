@@ -5,10 +5,11 @@ OpenCode plugin that replaces Requesty's seeded `models.dev` catalog with the li
 ## What it does
 
 - refreshes Requesty's model list during provider bootstrap
+- retries one transient refresh failure before giving up
 - keeps seeded metadata when live fields are missing
 - overrides seeded price, limit, and capability data when live values are present
 - removes seeded models that are not available for the current key
-- falls back to the seeded catalog if the live fetch fails
+- falls back to a cached live catalog for the same key before using the seeded catalog
 
 ## Requirements
 
@@ -41,6 +42,8 @@ Verify that the live catalog is being used:
 ```bash
 opencode models requesty
 ```
+
+The plugin caches the last successful live catalog in the local user cache directory so transient Requesty outages do not immediately drop back to the seeded catalog. Cache files are keyed by a secret-derived HMAC prefix, not the raw API key.
 
 ## Local Development
 
