@@ -32,9 +32,30 @@ describe("requesty auth hook", () => {
     })
     const state = provider()
 
-    await hook.loader?.(async () => ({ type: "api", key: "rq_test" }), state)
+    const result = await hook.loader?.(async () => ({ type: "api", key: "rq_test" }), state)
 
     expect(Object.keys(state.models)).toEqual(["deepseek/deepseek-chat", "zai/GLM-4.5"])
+    expect(result?.models).toBe(state.models)
+  })
+
+  test("rebuilds provider models from the public catalog without auth", async () => {
+    let headers: Headers | undefined
+    const hook = requesty({
+      fetch: async (_input, init) => {
+        headers = new Headers(init?.headers)
+        return liveResponse()
+      },
+      cache: emptyCache,
+    })
+    const state = provider()
+
+    const result = await hook.loader?.(async () => {
+      throw new Error("no saved auth")
+    }, state)
+
+    expect(headers?.get("Authorization")).toBeNull()
+    expect(Object.keys(state.models)).toEqual(["deepseek/deepseek-chat", "zai/GLM-4.5"])
+    expect(result?.models).toBe(state.models)
   })
 
   test("retries one transient failure before succeeding", async () => {
@@ -86,9 +107,10 @@ describe("requesty auth hook", () => {
     })
     const state = provider()
 
-    await hook.loader?.(async () => ({ type: "api", key: "rq_test" }), state)
+    const result = await hook.loader?.(async () => ({ type: "api", key: "rq_test" }), state)
 
     expect(Object.keys(state.models)).toEqual(["zai/GLM-4.5"])
+    expect(result?.models).toBe(state.models)
     expect(lines).toContainEqual({
       level: "warn",
       message: "failed to refresh Requesty model catalog; using cached catalog",

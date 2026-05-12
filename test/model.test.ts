@@ -139,4 +139,66 @@ describe("buildModels", () => {
 
     expect(next["openai/gpt-5.4"]?.api.npm).toBe(pkg)
   })
+
+  test("routes Requesty openai display models through hidden matching responses models", () => {
+    const state = provider()
+    const next = buildModels(state, [
+      {
+        id: "openai/gpt-5.5",
+        api: "chat",
+      },
+      {
+        id: "openai-responses/gpt-5.5",
+        api: "responses",
+      },
+    ], pkg)
+
+    expect(next["openai/gpt-5.5"]?.id).toBe("openai/gpt-5.5")
+    expect(next["openai/gpt-5.5"]?.api.id).toBe("openai-responses/gpt-5.5")
+    expect(next["openai/gpt-5.5"]?.name).toBe("GPT 5.5")
+    expect(next["openai-responses/gpt-5.5"]).toBeUndefined()
+  })
+
+  test("keeps friendly names for visible OpenAI and responses-only models", () => {
+    const state = provider()
+    state.models["openai/gpt-5.4"] = {
+      ...state.models["deepseek/deepseek-chat"],
+      id: "openai/gpt-5.4",
+      api: {
+        ...state.models["deepseek/deepseek-chat"].api,
+        id: "openai/gpt-5.4",
+      },
+      name: "GPT-5.4",
+    }
+    const next = buildModels(state, [
+      {
+        id: "openai/gpt-5.4",
+        api: "chat",
+      },
+      {
+        id: "openai-responses/gpt-5.4",
+        api: "responses",
+      },
+      {
+        id: "openai-responses/gpt-5.5",
+        api: "responses",
+      },
+    ], pkg)
+
+    expect(next["openai/gpt-5.4"]?.name).toBe("GPT-5.4")
+    expect(next["openai-responses/gpt-5.4"]).toBeUndefined()
+    expect(next["openai-responses/gpt-5.5"]?.name).toBe("GPT 5.5 - Responses")
+  })
+
+  test("keeps Requesty openai API ids when no matching responses model exists", () => {
+    const state = provider()
+    const next = buildModels(state, [
+      {
+        id: "openai/gpt-5-mini:priority",
+        api: "chat",
+      },
+    ], pkg)
+
+    expect(next["openai/gpt-5-mini:priority"]?.api.id).toBe("openai/gpt-5-mini:priority")
+  })
 })

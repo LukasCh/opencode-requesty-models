@@ -217,7 +217,43 @@ function capabilities(seed: RequestyRuntimeModel, item: RequestyModel) {
   }
 }
 
-function build(provider: RequestyProvider, source: Record<string, RequestyRuntimeModel>, item: RequestyModel, pkg: string) {
+function apiID(id: string, ids: Set<string>) {
+  if (!id.startsWith("openai/")) return id
+  const responseID = `openai-responses/${id.slice("openai/".length)}`
+  return ids.has(responseID) ? responseID : id
+}
+
+function hiddenResponseID(id: string, ids: Set<string>) {
+  if (!id.startsWith("openai-responses/")) return false
+  return ids.has(`openai/${id.slice("openai-responses/".length)}`)
+}
+
+function title(value: string) {
+  return value
+    .split(/[-_:]/)
+    .filter(Boolean)
+    .map((part) => {
+      if (part === "gpt") return "GPT"
+      if (/^o\d/i.test(part)) return part.toUpperCase()
+      return `${part.charAt(0).toUpperCase()}${part.slice(1)}`
+    })
+    .join(" ")
+}
+
+function responseName(id: string, names: Map<string, string>) {
+  if (!id.startsWith("openai-responses/")) return undefined
+  const base = id.slice("openai-responses/".length)
+  const match = names.get(`openai/${base}`)
+  const name = match && match !== `openai/${base}` ? match : title(base)
+  return name.endsWith(" - Responses") ? name : `${name} - Responses`
+}
+
+function openAIName(id: string) {
+  if (!id.startsWith("openai/")) return undefined
+  return title(id.slice("openai/".length))
+}
+
+function build(provider: RequestyProvider, source: Record<string, RequestyRuntimeModel>, item: RequestyModel, ids: Set<string>, names: Map<string, string>, pkg: string) {
   const hit = source[item.id]
   const match = hit ?? base(provider, source)
 
@@ -226,11 +262,11 @@ function build(provider: RequestyProvider, source: Record<string, RequestyRuntim
     id: item.id,
     providerID: provider.id,
     api: {
-      id: item.id,
+      id: apiID(item.id, ids),
       url: match.api.url,
       npm: npm(match, pkg),
     },
-    name: item.name ?? hit?.name ?? item.id,
+    name: item.name ?? hit?.name ?? responseName(item.id, names) ?? openAIName(item.id) ?? item.id,
     family: item.family ?? hit?.family,
     capabilities: capabilities(match, item),
     cost: cost(match, item),
@@ -246,14 +282,22 @@ function build(provider: RequestyProvider, source: Record<string, RequestyRuntim
 export function buildModels(provider: RequestyProvider, models: RequestyModel[], pkg: string) {
   const curr = provider.models
   const source = { ...curr }
-  const keep = new Set(models.map((item) => item.id))
+  const ids = new Set(models.map((item) => item.id))
+  const visible = models.filter((item) => !hiddenResponseID(item.id, ids))
+  const keep = new Set(visible.map((item) => item.id))
+  const names = new Map(Object.entries(source).map(([id, model]) => [id, model.name]))
+
+  for (const item of models) {
+    const name = item.name ?? source[item.id]?.name
+    if (name) names.set(item.id, name)
+  }
 
   for (const id of Object.keys(curr)) {
     if (!keep.has(id)) delete curr[id]
   }
 
-  for (const item of models) {
-    const next = build(provider, source, item, pkg)
+  for (const item of visible) {
+    const next = build(provider, source, item, ids, names, pkg)
     const hit = curr[item.id]
     curr[item.id] = hit ? Object.assign(hit, next) : next
   }

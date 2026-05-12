@@ -21,12 +21,20 @@ function responseRetryable(status: number) {
   return status === 408 || status === 429 || status >= 500
 }
 
-async function request(key: string, opts: { fetch?: Fetcher; timeout?: number } = {}) {
+function headers(key: string | undefined): Record<string, string> {
+  const result = {
+    "User-Agent": "opencode-requesty-models",
+  }
+  if (!key) return result
+  return {
+    ...result,
+    Authorization: `Bearer ${key}`,
+  }
+}
+
+async function request(key: string | undefined, opts: { fetch?: Fetcher; timeout?: number } = {}) {
   const res = await (opts.fetch ?? fetch)(requestyModelsUrl, {
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "User-Agent": "opencode-requesty-models",
-    },
+    headers: headers(key),
     signal: AbortSignal.timeout(opts.timeout ?? 5000),
   })
 
@@ -75,7 +83,7 @@ export function isTransientFetchError(error: unknown): error is RequestyFetchErr
 }
 
 export async function fetchModels(
-  key: string,
+  key?: string,
   opts: { fetch?: Fetcher; timeout?: number; attempts?: number; onRetry?: RetryHandler } = {},
 ) {
   const maxAttempts = Math.max(1, opts.attempts ?? 2)
