@@ -140,7 +140,7 @@ describe("buildModels", () => {
     expect(next["openai/gpt-5.4"]?.api.npm).toBe(pkg)
   })
 
-  test("routes Requesty openai display models through hidden matching responses models", () => {
+  test("routes Requesty openai display models through matching responses models", () => {
     const state = provider()
     const next = buildModels(state, [
       {
@@ -156,7 +156,8 @@ describe("buildModels", () => {
     expect(next["openai/gpt-5.5"]?.id).toBe("openai/gpt-5.5")
     expect(next["openai/gpt-5.5"]?.api.id).toBe("openai-responses/gpt-5.5")
     expect(next["openai/gpt-5.5"]?.name).toBe("GPT 5.5")
-    expect(next["openai-responses/gpt-5.5"]).toBeUndefined()
+    expect(next["openai-responses/gpt-5.5"]?.api.id).toBe("openai-responses/gpt-5.5")
+    expect(next["openai-responses/gpt-5.5"]?.name).toBe("GPT 5.5 - Responses")
   })
 
   test("keeps friendly names for visible OpenAI and responses-only models", () => {
@@ -186,7 +187,7 @@ describe("buildModels", () => {
     ], pkg)
 
     expect(next["openai/gpt-5.4"]?.name).toBe("GPT-5.4")
-    expect(next["openai-responses/gpt-5.4"]).toBeUndefined()
+    expect(next["openai-responses/gpt-5.4"]?.name).toBe("GPT-5.4 - Responses")
     expect(next["openai-responses/gpt-5.5"]?.name).toBe("GPT 5.5 - Responses")
   })
 

@@ -223,11 +223,6 @@ function apiID(id: string, ids: Set<string>) {
   return ids.has(responseID) ? responseID : id
 }
 
-function hiddenResponseID(id: string, ids: Set<string>) {
-  if (!id.startsWith("openai-responses/")) return false
-  return ids.has(`openai/${id.slice("openai-responses/".length)}`)
-}
-
 function title(value: string) {
   return value
     .split(/[-_:]/)
@@ -283,8 +278,7 @@ export function buildModels(provider: RequestyProvider, models: RequestyModel[],
   const curr = provider.models
   const source = { ...curr }
   const ids = new Set(models.map((item) => item.id))
-  const visible = models.filter((item) => !hiddenResponseID(item.id, ids))
-  const keep = new Set(visible.map((item) => item.id))
+  const keep = new Set(models.map((item) => item.id))
   const names = new Map(Object.entries(source).map(([id, model]) => [id, model.name]))
 
   for (const item of models) {
@@ -296,7 +290,7 @@ export function buildModels(provider: RequestyProvider, models: RequestyModel[],
     if (!keep.has(id)) delete curr[id]
   }
 
-  for (const item of visible) {
+  for (const item of models) {
     const next = build(provider, source, item, ids, names, pkg)
     const hit = curr[item.id]
     curr[item.id] = hit ? Object.assign(hit, next) : next
