@@ -1,7 +1,15 @@
 import { parseModels } from "./parse.js"
 
 export const requestyModelsUrl = "https://router.requesty.ai/v1/models"
+export const requestyApiKeyUrl = "https://api-v2.requesty.ai/v1/manage/apikey/self"
 export type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+
+export type RequestyUsage = {
+  id: string
+  name: string
+  monthlySpend: number
+  monthlyLimit: number
+}
 
 type RetryHandler = (input: { attempt: number; maxAttempts: number; error: RequestyFetchError }) => Promise<void> | void
 
@@ -23,12 +31,65 @@ function responseRetryable(status: number) {
 
 function headers(key: string | undefined): Record<string, string> {
   const result = {
+    Accept: "application/json",
     "User-Agent": "opencode-requesty-models",
   }
   if (!key) return result
   return {
     ...result,
     Authorization: `Bearer ${key}`,
+  }
+}
+
+function record(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function text(value: unknown) {
+  if (typeof value !== "string") return undefined
+  return value.trim() || undefined
+}
+
+function num(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  if (typeof value !== "string" || !value.trim()) return undefined
+
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+function usageSource(value: unknown): Record<string, unknown> | undefined {
+  if (!record(value)) return undefined
+  if (num(value.monthly_spend ?? value.monthlySpend) !== undefined && num(value.monthly_limit ?? value.monthlyLimit) !== undefined) {
+    return value
+  }
+
+  for (const key of ["data", "api_key", "apiKey", "key", "result"]) {
+    const match = usageSource(value[key])
+    if (match) return match
+  }
+
+  return undefined
+}
+
+function parseUsage(input: unknown): RequestyUsage {
+  const value = usageSource(input)
+  if (!value) throw new Error("missing monthly spend or monthly limit fields")
+
+  const id = text(value.id)
+  const name = text(value.name) ?? text(value.label) ?? "Current API key"
+  const monthlySpend = num(value.monthly_spend ?? value.monthlySpend)
+  const monthlyLimit = num(value.monthly_limit ?? value.monthlyLimit)
+
+  if (monthlySpend === undefined || monthlyLimit === undefined) {
+    throw new Error("missing usage fields")
+  }
+
+  return {
+    id: id ?? "self",
+    name,
+    monthlySpend,
+    monthlyLimit,
   }
 }
 
@@ -99,4 +160,38 @@ export async function fetchModels(
   }
 
   throw new RequestyFetchError("Requesty models request failed", { transient: false })
+}
+
+export async function fetchUsage(key: string, opts: { fetch?: Fetcher; timeout?: number } = {}) {
+  const res = await (opts.fetch ?? fetch)(requestyApiKeyUrl, {
+    headers: headers(key),
+    signal: AbortSignal.timeout(opts.timeout ?? 5000),
+  })
+
+  if (!res.ok) {
+    throw new RequestyFetchError(`Requesty usage request failed with ${res.status}`, {
+      transient: responseRetryable(res.status),
+      status: res.status,
+    })
+  }
+
+  const contentType = res.headers.get("content-type") ?? "unknown"
+  let body: unknown
+  try {
+    body = JSON.parse(await res.text())
+  } catch (error) {
+    throw new RequestyFetchError(`Requesty usage response was not valid JSON (status ${res.status}, content-type ${contentType})`, {
+      transient: false,
+      cause: error,
+    })
+  }
+
+  try {
+    return parseUsage(body)
+  } catch (error) {
+    throw new RequestyFetchError(`Requesty usage response did not include monthly spend and limit (status ${res.status}, content-type ${contentType})`, {
+      transient: false,
+      cause: error,
+    })
+  }
 }

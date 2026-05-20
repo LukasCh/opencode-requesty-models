@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { requesty } from "../src/requesty.ts"
+import { RequestyModelsPlugin, requesty } from "../src/requesty.ts"
 import { payload, provider } from "./fixture.ts"
 
 const liveResponse = () =>
@@ -195,5 +195,115 @@ describe("requesty auth hook", () => {
 
     expect(calls).toBe(1)
     expect(state.models).toEqual(seed)
+  })
+})
+
+describe("requesty usage command", () => {
+  test("registers the usage command", async () => {
+    const hooks = await RequestyModelsPlugin({
+      client: {
+        app: {
+          log: async () => undefined,
+        },
+      },
+    } as never)
+    const cfg: { command?: Record<string, unknown> } = {}
+
+    await hooks.config?.(cfg as never)
+
+    expect(cfg.command?.["requesty-usage"]).toEqual({
+      description: "Show Requesty monthly spend and limit",
+      template: "/requesty-usage",
+    })
+  })
+
+  test("injects current usage without requesting an LLM reply", async () => {
+    const originalFetch = globalThis.fetch
+    const originalKey = process.env.REQUESTY_API_KEY
+    let authorization: string | null = null
+    let accept: string | null = null
+    let url = ""
+    let prompt: unknown
+    process.env.REQUESTY_API_KEY = "rq_test"
+    globalThis.fetch = (async (input, init) => {
+      url = String(input)
+      const headers = new Headers(init?.headers)
+      authorization = headers.get("Authorization")
+      accept = headers.get("Accept")
+      return new Response(
+        JSON.stringify({
+          data: {
+            api_key: {
+              id: "00000000-0000-0000-0000-000000000000",
+              name: "Test key",
+              logging: true,
+              monthly_spend: "12.34",
+              monthly_limit: "50",
+              permissions: {
+                manage: "read",
+                completions: "write",
+              },
+            },
+          },
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      )
+    }) as typeof fetch
+
+    try {
+      const hooks = await RequestyModelsPlugin({
+        client: {
+          session: {
+            prompt: async (input: unknown) => {
+              prompt = input
+            },
+          },
+          app: {
+            log: async () => undefined,
+          },
+        },
+      } as never)
+
+      await expect(
+        hooks["command.execute.before"]?.({
+          command: "requesty-usage",
+          sessionID: "session",
+          arguments: "",
+        }),
+      ).rejects.toThrow("__REQUESTY_USAGE_COMMAND_HANDLED__")
+
+      expect(url).toBe("https://api-v2.requesty.ai/v1/manage/apikey/self")
+      expect(authorization).toBe("Bearer rq_test")
+      expect(accept).toBe("application/json")
+      expect(prompt).toEqual({
+        path: { id: "session" },
+        body: {
+          noReply: true,
+          parts: [
+            {
+              type: "text",
+              text: [
+                "Requesty API key usage",
+                "",
+                "Key: Test key",
+                "Monthly spend: $12.34",
+                "Monthly limit: $50.00",
+                "Remaining: $37.66",
+                "Used: 24.7%",
+              ].join("\n"),
+              ignored: true,
+            },
+          ],
+        },
+      })
+    } finally {
+      globalThis.fetch = originalFetch
+      if (originalKey === undefined) delete process.env.REQUESTY_API_KEY
+      else process.env.REQUESTY_API_KEY = originalKey
+    }
   })
 })

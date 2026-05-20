@@ -1,6 +1,6 @@
 import type { Hooks, Plugin, ProviderHookContext } from "@opencode-ai/plugin"
 import { catalogCache, type CatalogCache } from "./cache.js"
-import { fetchModels, isTransientFetchError, type Fetcher } from "./fetch.js"
+import { fetchModels, fetchUsage, isTransientFetchError, type Fetcher, type RequestyUsage } from "./fetch.js"
 import { buildModels, type RequestyProvider, type RequestyRuntimeModel } from "./model.js"
 
 export type Log = (level: "debug" | "info" | "warn" | "error", message: string, extra?: Record<string, unknown>) => Promise<void>
@@ -13,7 +13,10 @@ type RequestyOptions = {
   timeout?: number
   cache?: CatalogCache
   refresh?: Refresh
+  onKey?: (key: string) => void
 }
+
+const commandHandled = "__REQUESTY_USAGE_COMMAND_HANDLED__"
 
 function mark(message: string) {
   console.error(`[opencode-requesty-models] ${message}`)
@@ -25,6 +28,58 @@ function message(error: unknown) {
 
 function key(auth: ProviderHookContext["auth"]) {
   return auth?.type === "api" && auth.key ? auth.key : undefined
+}
+
+function amount(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: value < 1 && value > 0 ? 4 : 2,
+    maximumFractionDigits: value < 1 && value > 0 ? 4 : 2,
+  }).format(value)
+}
+
+function usageText(usage: RequestyUsage) {
+  const lines = [
+    "Requesty API key usage",
+    "",
+    `Key: ${usage.name}`,
+    `Monthly spend: ${amount(usage.monthlySpend)}`,
+  ]
+
+  if (usage.monthlyLimit === 0) {
+    lines.push("Monthly limit: Unlimited")
+  } else {
+    const remaining = Math.max(usage.monthlyLimit - usage.monthlySpend, 0)
+    const percent = Math.min((usage.monthlySpend / usage.monthlyLimit) * 100, 100)
+    lines.push(`Monthly limit: ${amount(usage.monthlyLimit)}`)
+    lines.push(`Remaining: ${amount(remaining)}`)
+    lines.push(`Used: ${percent.toFixed(1)}%`)
+  }
+
+  return lines.join("\n")
+}
+
+async function usagePrompt(apiKey: string | undefined, opts: RequestyOptions) {
+  if (!apiKey) {
+    return [
+      "Requesty usage is unavailable because no Requesty API key is loaded.",
+      "Save credentials with `opencode auth login`, choose Requesty, then run `/requesty-usage` again.",
+    ].join("\n")
+  }
+
+  try {
+    const usage = await fetchUsage(apiKey, {
+      fetch: opts.fetch,
+      timeout: opts.timeout,
+    })
+    return usageText(usage)
+  } catch (error) {
+    await opts.log?.("warn", "failed to fetch Requesty usage", {
+      error: message(error),
+    })
+    return `Failed to fetch Requesty usage: ${message(error)}`
+  }
 }
 
 async function readKey(auth: AuthReader, log?: Log) {
@@ -43,6 +98,7 @@ async function models(provider: RequestyProvider, opts: RequestyOptions, auth?: 
   const pkg = "@ai-sdk/openai-compatible"
   const cache = opts.cache ?? catalogCache
   const apiKey = key(auth)
+  if (apiKey) opts.onKey?.(apiKey)
   const cacheKey = apiKey ?? "public"
 
   const count = Object.keys(provider.models).length
@@ -117,6 +173,7 @@ export function requesty(opts: RequestyOptions = {}): NonNullable<Hooks["auth"]>
     async loader(auth, provider) {
       if (!provider?.models) return {}
       const apiKey = await readKey(auth, opts.log)
+      if (apiKey) opts.onKey?.(apiKey)
       const next = await (opts.refresh ?? ((input, inputAuth) => models(input, opts, inputAuth)))(
         provider as RequestyProvider,
         apiKey ? { type: "api", key: apiKey } : undefined,
@@ -143,6 +200,10 @@ export const RequestyModelsPlugin: Plugin = async (input) => {
     },
   }
   let previous: { key: string; result: Promise<Record<string, RequestyRuntimeModel>> } | undefined
+  let usageKey = process.env.REQUESTY_API_KEY
+  opts.onKey = (apiKey) => {
+    usageKey = apiKey
+  }
 
   opts.refresh = (provider, auth) => {
     const cacheKey = key(auth) ?? "public"
@@ -155,13 +216,47 @@ export const RequestyModelsPlugin: Plugin = async (input) => {
     return result
   }
 
+  async function injectRawOutput(sessionID: string, output: string) {
+    await (input.client as any).session.prompt({
+      path: { id: sessionID },
+      body: {
+        noReply: true,
+        parts: [
+          {
+            type: "text",
+            text: output,
+            ignored: true,
+          },
+        ],
+      },
+    })
+  }
+
+  async function handleUsageCommand(sessionID: string): Promise<never> {
+    await injectRawOutput(sessionID, await usagePrompt(usageKey, opts))
+    throw new Error(commandHandled)
+  }
+
   return {
+    config(cfg) {
+      cfg.command ??= {}
+      cfg.command["requesty-usage"] = {
+        description: "Show Requesty monthly spend and limit",
+        template: "/requesty-usage",
+      }
+      return Promise.resolve()
+    },
     auth: requesty(opts),
     provider: {
       id: "requesty",
       models(provider, ctx) {
+        usageKey = key(ctx.auth) ?? usageKey
         return opts.refresh!(provider as RequestyProvider, ctx.auth)
       },
+    },
+    async "command.execute.before"(command) {
+      if (command.command !== "requesty-usage") return
+      return handleUsageCommand(command.sessionID)
     },
   }
 }
